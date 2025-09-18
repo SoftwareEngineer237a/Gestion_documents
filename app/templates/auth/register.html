@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/auth/register.css') }}">
+<div class="auth-container">
+  <h2>Inscription</h2>
+  <form action="{{ url_for('auth.register') }}" method="POST">
+    <label for="prenom">Prénom :</label>
+    <input type="text" id="prenom" name="prenom" required>
+
+    <label for="nom">Nom :</label>
+    <input type="text" id="nom" name="nom" required>
+
+    <label for="mail">Email :</label>
+    <input type="email" id="mail" name="mail" required>
+
+    <label for="password">Mot de passe :</label>
+    <input type="password" id="password" name="password" required>
+
+    <label for="role">Rôle :</label>
+    <select id="role" name="role" required>
+      <option value="employee">Employé</option>
+      <option value="manager">Manager</option>
+      <option value="security">Responsable sécurité</option>
+      <option value="admin">Admin</option>
+    </select>
+
+    <button type="submit">Créer le compte</button>
+  </form>
+</div>
+{% endblock %}
