@@ -7,7 +7,13 @@ auth_bp = Blueprint("auth", __name__, template_folder="../templates/auth")
 
 # ----- INSCRIPTION -----
 @auth_bp.route("/register", methods=["GET", "POST"])
+@login_required  # Ajoutez cette ligne pour restreindre l'accès aux utilisateurs connectés
 def register():
+    # Vérifiez que seul l'admin peut créer des comptes
+    if not current_user.is_admin():
+        flash("Accès refusé. Seuls les administrateurs peuvent créer des comptes.", "danger")
+        return redirect(url_for('admin.dashboard'))
+    
     if request.method == "POST":
         prenom = request.form.get("prenom")
         nom = request.form.get("nom")
@@ -25,8 +31,8 @@ def register():
         db.session.add(new_user)
         db.session.commit()
 
-        flash("Compte créé avec succès ! Vous pouvez maintenant vous connecter.", "success")
-        return redirect(url_for("auth.login"))
+        flash("Compte créé avec succès !", "success")
+        return redirect(url_for("admin.manage_users"))  # Rediriger vers la gestion des utilisateurs
 
     return render_template("auth/register.html")
 

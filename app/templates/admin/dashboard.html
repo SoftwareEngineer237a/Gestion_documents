@@ -1,12 +1,29 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
-    <h1>Tableau de bord Administrateur</h1>
-    <p>Bienvenue sur le tableau de bord administrateur.</p>
-</body>
-</html>
+{% extends "admin/base.html" %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/dashboard.css') }}">
+
+<div class="dashboard-container">
+  <h1>Bienvenue, {{ user.prenom }} (Admin)</h1>
+  <p>Date de création du compte : {{ user.date_creation.strftime('%d/%m/%Y') }}</p>
+
+  <div class="cards">
+    <div class="card">
+      <h3>Utilisateurs</h3>
+      <p>Gérer les utilisateurs et leurs rôles.</p>
+      <a href="#">➡️ Gérer</a>
+    </div>
+
+    <div class="card">
+      <h3>Droits d’accès</h3>
+      <p>Attribuer et modifier les droits des utilisateurs.</p>
+      <a href="#">➡️ Attribuer</a>
+    </div>
+
+    <div class="card">
+      <h3>Journaux</h3>
+      <p>Consulter les logs et activités.</p>
+      <a href="#">➡️ Voir</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

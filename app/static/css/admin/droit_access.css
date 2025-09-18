@@ -1,0 +1,33 @@
+/* Styles pour la gestion des droits d'accès */
+.permission-check {
+    margin-right: 0.5rem;
+}
+
+.form-check {
+    margin-bottom: 0.5rem;
+}
+
+#permissionsList {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+#permissionsList table {
+    margin-bottom: 0;
+}
+
+#permissionsList .badge {
+    font-size: 0.8em;
+    padding: 0.4em 0.6em;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .card {
+        margin-bottom: 1rem;
+    }
+    
+    #permissionsList {
+        max-height: 300px;
+    }
+}

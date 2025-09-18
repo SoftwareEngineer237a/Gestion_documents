@@ -1,0 +1,324 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Gestion des Droits d'Accès{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/admin/droit_acces.css') }}">
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Gestion des Droits d'Accès</h1>
+    </div>
+
+    <div class="row">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Attribution des Droits</h5>
+                </div>
+                <div class="card-body">
+                    <form id="permissionForm">
+                        <div class="mb-3">
+                            <label for="userSelect" class="form-label">Utilisateur</label>
+                            <select class="form-select" id="userSelect" required>
+                                <option value="">Sélectionner un utilisateur</option>
+                                {% for user in users %}
+                                <option value="{{ user.id }}">{{ user.nom_complet() }} ({{ user.role }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="documentSelect" class="form-label">Document</label>
+                            <select class="form-select" id="documentSelect" required>
+                                <option value="">Sélectionner un document</option>
+                                {% for document in documents %}
+                                <option value="{{ document.id }}">{{ document.titre }} ({{ document.typedoc }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Droits d'Accès</label>
+                            <div class="form-check">
+                                <input class="form-check-input permission-check" type="checkbox" value="lecture" id="lectureCheck">
+                                <label class="form-check-label" for="lectureCheck">Lecture</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input permission-check" type="checkbox" value="ecriture" id="ecritureCheck">
+                                <label class="form-check-label" for="ecritureCheck">Écriture</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input permission-check" type="checkbox" value="partage" id="partageCheck">
+                                <label class="form-check-label" for="partageCheck">Partage</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input permission-check" type="checkbox" value="suppression" id="suppressionCheck">
+                                <label class="form-check-label" for="suppressionCheck">Suppression</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input permission-check" type="checkbox" value="validation" id="validationCheck">
+                                <label class="form-check-label" for="validationCheck">Validation</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input permission-check" type="checkbox" value="modification" id="modificationCheck">
+                                <label class="form-check-label" for="modificationCheck">Modification</label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">Appliquer les droits</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Droits Actuels par Document</h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label for="filterDocument" class="form-label">Filtrer par document</label>
+                        <select class="form-select" id="filterDocument">
+                            <option value="">Tous les documents</option>
+                            {% for document in documents %}
+                            <option value="{{ document.id }}">{{ document.titre }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div id="permissionsList">
+                        <div class="alert alert-info">
+                            Sélectionnez un document pour voir les droits attribués.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Stocker les permissions existantes pour pré-remplir les cases
+const existingPermissions = {{ existing_permissions|tojson }};
+
+// Pré-remplir les cases à cocher basé sur les permissions existantes
+function updateCheckboxes() {
+    const userId = document.getElementById('userSelect').value;
+    const docId = document.getElementById('documentSelect').value;
+    const key = `${userId}_${docId}`;
+    
+    // Décocher toutes les cases d'abord
+    document.querySelectorAll('.permission-check').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    
+    // Cocher les cases correspondant aux permissions existantes
+    if (existingPermissions[key]) {
+        existingPermissions[key].forEach(permission => {
+            const checkbox = document.querySelector(`.permission-check[value="${permission}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+        });
+    }
+}
+
+// Écouter les changements de sélection
+document.getElementById('userSelect').addEventListener('change', updateCheckboxes);
+document.getElementById('documentSelect').addEventListener('change', updateCheckboxes);
+
+// Soumission du formulaire
+document.getElementById('permissionForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const userId = document.getElementById('userSelect').value;
+    const docId = document.getElementById('documentSelect').value;
+    
+    if (!userId || !docId) {
+        showAlert('Veuillez sélectionner un utilisateur et un document', 'warning');
+        return;
+    }
+    
+    // Traiter chaque case à cocher
+    const checkboxes = document.querySelectorAll('.permission-check:checked');
+    if (checkboxes.length === 0) {
+        showAlert('Veuillez sélectionner au moins un droit', 'warning');
+        return;
+    }
+    
+    // Pour chaque case cochée, ajouter le droit
+    const promises = [];
+    checkboxes.forEach(checkbox => {
+        const promise = fetch('/admin/update_permissions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                user_id: userId,
+                doc_id: docId,
+                permission_type: checkbox.value,
+                action: 'add'
+            })
+        })
+        .then(response => response.json());
+        
+        promises.push(promise);
+    });
+    
+    // Attendre que toutes les requêtes soient terminées
+    Promise.all(promises)
+        .then(results => {
+            const allSuccess = results.every(result => result.success);
+            if (allSuccess) {
+                showAlert('Droits attribués avec succès', 'success');
+                // Mettre à jour les permissions existantes
+                const key = `${userId}_${docId}`;
+                if (!existingPermissions[key]) {
+                    existingPermissions[key] = [];
+                }
+                checkboxes.forEach(checkbox => {
+                    if (!existingPermissions[key].includes(checkbox.value)) {
+                        existingPermissions[key].push(checkbox.value);
+                    }
+                });
+                // Recharger les permissions du document
+                loadDocumentPermissions(docId);
+            } else {
+                showAlert('Erreur lors de l\'attribution des droits', 'danger');
+            }
+        })
+        .catch(error => {
+            showAlert('Erreur lors de l\'attribution des droits', 'danger');
+            console.error('Error:', error);
+        });
+});
+
+// Charger les permissions d'un document
+function loadDocumentPermissions(docId) {
+    if (!docId) {
+        document.getElementById('permissionsList').innerHTML = `
+            <div class="alert alert-info">
+                Sélectionnez un document pour voir les droits attribués.
+            </div>
+        `;
+        return;
+    }
+    
+    fetch(`/admin/get_document_permissions/${docId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (data.permissions.length > 0) {
+                    let html = `<div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead>
+                                <tr>
+                                    <th>Utilisateur</th>
+                                    <th>Droit</th>
+                                    <th>Date Attribution</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                    
+                    data.permissions.forEach(perm => {
+                        html += `
+                            <tr>
+                                <td>${perm.user_name}</td>
+                                <td><span class="badge bg-primary">${perm.permission_type}</span></td>
+                                <td>${perm.date_attribution}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-danger" onclick="removePermission(${perm.user_id}, ${docId}, '${perm.permission_type}')">
+                                        <i class="bi bi-trash"></i> Retirer
+                                    </button>
+                                </td>
+                            </tr>`;
+                    });
+                    
+                    html += `</tbody></table></div>`;
+                    document.getElementById('permissionsList').innerHTML = html;
+                } else {
+                    document.getElementById('permissionsList').innerHTML = `
+                        <div class="alert alert-info">
+                            Aucun droit attribué pour ce document.
+                        </div>
+                    `;
+                }
+            } else {
+                showAlert('Erreur lors du chargement des permissions', 'danger');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+}
+
+// Retirer une permission
+function removePermission(userId, docId, permissionType) {
+    if (!confirm('Êtes-vous sûr de vouloir retirer ce droit ?')) {
+        return;
+    }
+    
+    fetch('/admin/update_permissions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            user_id: userId,
+            doc_id: docId,
+            permission_type: permissionType,
+            action: 'remove'
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert(data.message, 'success');
+            // Mettre à jour les permissions existantes
+            const key = `${userId}_${docId}`;
+            if (existingPermissions[key]) {
+                const index = existingPermissions[key].indexOf(permissionType);
+                if (index > -1) {
+                    existingPermissions[key].splice(index, 1);
+                }
+            }
+            // Recharger les permissions
+            loadDocumentPermissions(docId);
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('Erreur lors du retrait du droit', 'danger');
+        console.error('Error:', error);
+    });
+}
+
+// Filtrer par document
+document.getElementById('filterDocument').addEventListener('change', function() {
+    const docId = this.value;
+    loadDocumentPermissions(docId);
+});
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    document.querySelector('.content').prepend(alertDiv);
+    
+    setTimeout(() => {
+        const bsAlert = new bootstrap.Alert(alertDiv);
+        bsAlert.close();
+    }, 5000);
+}
+</script>
+{% endblock %}

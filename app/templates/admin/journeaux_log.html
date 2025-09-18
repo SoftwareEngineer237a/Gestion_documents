@@ -1,0 +1,373 @@
+{% extends "admin/base.html" %}
+
+{% block title %}Journaux d'Activité{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Journaux d'Activité</h1>
+        <button class="btn btn-outline-primary" onclick="exportLogs()">
+            <i class="bi bi-download"></i> Exporter
+        </button>
+    </div>
+
+    <!-- Filtres -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="mb-0">Filtres</h5>
+        </div>
+        <div class="card-body">
+            <form id="filterForm">
+                <div class="row">
+                    <div class="col-md-3">
+                        <label for="startDate" class="form-label">Date début</label>
+                        <input type="date" class="form-control" id="startDate" value="{{ start_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="endDate" class="form-label">Date fin</label>
+                        <input type="date" class="form-control" id="endDate" value="{{ end_date }}">
+                    </div>
+                    <div class="col-md-3">
+                        <label for="userFilter" class="form-label">Utilisateur</label>
+                        <select class="form-select" id="userFilter">
+                            <option value="all">Tous les utilisateurs</option>
+                            {% for user in users %}
+                            <option value="{{ user.id }}">{{ user.nom_complet() }} ({{ user.role }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label for="actionFilter" class="form-label">Type d'action</label>
+                        <select class="form-select" id="actionFilter">
+                            <option value="all">Toutes les actions</option>
+                            {% for action in action_types %}
+                            <option value="{{ action }}">{{ action|capitalize }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-funnel"></i> Appliquer les filtres
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="resetFilters()">
+                            <i class="bi bi-arrow-clockwise"></i> Réinitialiser
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Statistiques -->
+    <div class="row mb-4">
+        {% for action, count in action_stats %}
+        <div class="col-md-2 col-sm-4 mb-3">
+            <div class="card text-center">
+                <div class="card-body">
+                    <h6 class="card-title">{{ action|capitalize }}</h6>
+                    <h3 class="card-text">{{ count }}</h3>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Tableau des logs -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Activités récentes</h5>
+            <span class="badge bg-primary" id="logCount">{{ logs|length }} activités</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Date & Heure</th>
+                            <th>Action</th>
+                            <th>Utilisateur</th>
+                            <th>Rôle</th>
+                            <th>Document</th>
+                            <th>Détails</th>
+                        </tr>
+                    </thead>
+                    <tbody id="logsTableBody">
+                        {% for log in logs %}
+                        <tr>
+                            <td>{{ log.dateaction.strftime('%d/%m/%Y %H:%M:%S') }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if log.action == 'connexion' %}bg-success
+                                    {% elif log.action == 'telechargement' %}bg-info
+                                    {% elif log.action == 'modification' %}bg-warning
+                                    {% elif log.action == 'suppression' %}bg-danger
+                                    {% elif log.action == 'partage' %}bg-primary
+                                    {% elif log.action == 'validation' %}bg-success
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ log.action }}
+                                </span>
+                            </td>
+                            <td>{{ log.prenom }} {{ log.nom }}</td>
+                            <td>
+                                <span class="badge 
+                                    {% if log.role == 'admin' %}bg-danger
+                                    {% elif log.role == 'manager' %}bg-warning
+                                    {% elif log.role == 'security' %}bg-info
+                                    {% else %}bg-secondary{% endif %}">
+                                    {{ log.role }}
+                                </span>
+                            </td>
+                            <td>{{ log.titre if log.titre else 'N/A' }}</td>
+                            <td>
+                                {% if log.details %}
+                                <button class="btn btn-sm btn-outline-secondary" 
+                                        data-bs-toggle="tooltip" 
+                                        title="{{ log.details }}">
+                                    <i class="bi bi-info-circle"></i>
+                                </button>
+                                {% else %}
+                                -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div>
+                    <span id="showingText">Affichage des {{ logs|length }} derniers logs</span>
+                </div>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" id="loadMoreBtn" onclick="loadMoreLogs()">
+                        <i class="bi bi-arrow-down"></i> Charger plus
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal d'export -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Exporter les journaux</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Sélectionnez le format d'export :</p>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="exportFormat" id="formatCsv" value="csv" checked>
+                    <label class="form-check-label" for="formatCsv">CSV (Excel)</label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+                <button type="button" class="btn btn-primary" onclick="confirmExport()">Exporter</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let currentFilters = {};
+
+// Initialiser les tooltips
+document.addEventListener('DOMContentLoaded', function() {
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+});
+
+// Appliquer les filtres
+document.getElementById('filterForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const filters = {
+        start_date: document.getElementById('startDate').value,
+        end_date: document.getElementById('endDate').value,
+        user_id: document.getElementById('userFilter').value,
+        action_type: document.getElementById('actionFilter').value
+    };
+    
+    currentFilters = filters;
+    currentPage = 1;
+    
+    fetchLogs(filters);
+});
+
+function fetchLogs(filters) {
+    fetch('/admin/filter_logs', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(filters)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            updateLogsTable(data.logs);
+            document.getElementById('logCount').textContent = `${data.logs.length} activités`;
+            document.getElementById('showingText').textContent = `Affichage de ${data.logs.length} logs`;
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('Erreur lors du filtrage des logs', 'danger');
+        console.error('Error:', error);
+    });
+}
+
+function updateLogsTable(logs) {
+    const tbody = document.getElementById('logsTableBody');
+    tbody.innerHTML = '';
+    
+    if (logs.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="6" class="text-center">Aucune activité trouvée pour les filtres sélectionnés</td>
+            </tr>
+        `;
+        return;
+    }
+    
+    logs.forEach(log => {
+        const row = document.createElement('tr');
+        
+        // Déterminer la classe du badge en fonction de l'action
+        let badgeClass = 'bg-secondary';
+        if (log.action === 'connexion') badgeClass = 'bg-success';
+        else if (log.action === 'telechargement') badgeClass = 'bg-info';
+        else if (log.action === 'modification') badgeClass = 'bg-warning';
+        else if (log.action === 'suppression') badgeClass = 'bg-danger';
+        else if (log.action === 'partage') badgeClass = 'bg-primary';
+        else if (log.action === 'validation') badgeClass = 'bg-success';
+        
+        // Déterminer la classe du badge de rôle
+        let roleBadgeClass = 'bg-secondary';
+        if (log.user_role === 'admin') roleBadgeClass = 'bg-danger';
+        else if (log.user_role === 'manager') roleBadgeClass = 'bg-warning';
+        else if (log.user_role === 'security') roleBadgeClass = 'bg-info';
+        
+        row.innerHTML = `
+            <td>${log.dateaction}</td>
+            <td><span class="badge ${badgeClass}">${log.action}</span></td>
+            <td>${log.user_prenom} ${log.user_nom}</td>
+            <td><span class="badge ${roleBadgeClass}">${log.user_role}</span></td>
+            <td>${log.document_titre}</td>
+            <td>
+                ${log.details ? `
+                <button class="btn btn-sm btn-outline-secondary" 
+                        data-bs-toggle="tooltip" 
+                        title="${log.details}">
+                    <i class="bi bi-info-circle"></i>
+                </button>
+                ` : '-'}
+            </td>
+        `;
+        
+        tbody.appendChild(row);
+    });
+    
+    // Réinitialiser les tooltips
+    const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+    tooltipTriggerList.map(function(tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl);
+    });
+}
+
+function resetFilters() {
+    document.getElementById('startDate').value = '{{ start_date }}';
+    document.getElementById('endDate').value = '{{ end_date }}';
+    document.getElementById('userFilter').value = 'all';
+    document.getElementById('actionFilter').value = 'all';
+    
+    currentFilters = {
+        start_date: '{{ start_date }}',
+        end_date: '{{ end_date }}',
+        user_id: 'all',
+        action_type: 'all'
+    };
+    
+    currentPage = 1;
+    fetchLogs(currentFilters);
+}
+
+function loadMoreLogs() {
+    currentPage++;
+    // Implémenter la pagination si nécessaire
+    showAlert('Fonctionnalité de pagination à implémenter', 'info');
+}
+
+function exportLogs() {
+    const exportModal = new bootstrap.Modal(document.getElementById('exportModal'));
+    exportModal.show();
+}
+
+function confirmExport() {
+    const format = document.querySelector('input[name="exportFormat"]:checked').value;
+    const filters = currentFilters;
+    
+    fetch('/admin/export_logs', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            ...filters,
+            format: format
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Télécharger le fichier
+            const blob = new Blob([data.content], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = data.filename;
+            link.click();
+            
+            const exportModal = bootstrap.Modal.getInstance(document.getElementById('exportModal'));
+            exportModal.hide();
+            
+            showAlert('Export terminé avec succès', 'success');
+        } else {
+            showAlert(data.message, 'danger');
+        }
+    })
+    .catch(error => {
+        showAlert('Erreur lors de l\'export', 'danger');
+        console.error('Error:', error);
+    });
+}
+
+function showAlert(message, type) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    
+    document.querySelector('.content').prepend(alertDiv);
+    
+    setTimeout(() => {
+        const bsAlert = new bootstrap.Alert(alertDiv);
+        bsAlert.close();
+    }, 5000);
+}
+</script>
+{% endblock %}
